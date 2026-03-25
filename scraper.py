@@ -1,25 +1,30 @@
 from selenium import webdriver
 from pandas import DataFrame
 from bs4 import BeautifulSoup
+from merge_files import mergeFiles 
 import time
-from selenium.webdriver.chrome.service import Service
 
 column_names = ['link', 'название', 'цена', 'год', 'город', 'дата', 'двигатель', 'кузов', 'пробег', 'коробка', 'цвет', 'привод', 'описание']
 dataframe = DataFrame(columns=column_names)
 array = []
 
-service = Service(executable_path=r"C:/SeleniumDrivers/chromedriver.exe")
-
-options= webdriver.ChromeOptions()
-options.add_argument("headless")
-options.add_argument("--disable-gpu")
-options.add_argument('--blink-settings=imagesEnabled=false')
+options= webdriver.EdgeOptions()
 options.add_argument('--log-level=3')
+driver = webdriver.Edge(options=options)
 
-driver = webdriver.Chrome(service=service, options=options)
+import undetected_chromedriver as uc
+from selenium.webdriver.chrome.options import Options
+options = uc.ChromeOptions()
+
+options.add_argument("--headless")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+
+driver = uc.Chrome(options=options, version_main=144)
 
 row = 1
-for page in range(10000):
+file_count = 0
+for page in range(1000):
     print("Scraping page " + str(page+1))
     page_link = 'https://avtoelon.uz/avto/?page=' + str(page+1)
     for i in range(100):
@@ -28,12 +33,16 @@ for page in range(10000):
             driver.get(page_link)
             break
         except:
-            time.sleep(15)
+            time.sleep(1000)
             continue
     html_text = driver.page_source
 
     soup = BeautifulSoup(html_text, 'html.parser')
     cars = soup.find_all('div', class_="a-elem")
+
+    if not cars:
+        print("No cars found on page " + str(page+1) + ", stopping.")
+        break
 
     for car in cars:
         list = []
@@ -55,13 +64,13 @@ for page in range(10000):
         else:
             dataframe.at[row, 'дата'] = "Null"
 
-        for i in range(10000):
+        for i in range(100):
             try:
                 time.sleep(2)
                 driver.get(url)
                 break
             except:
-                time.sleep(15)
+                time.sleep(600)
                 continue
 
         car_page_html = driver.page_source
@@ -121,6 +130,15 @@ for page in range(10000):
         else:
             dataframe.at[row, 'описание'] = "Null"
         row = row + 1
-        time.sleep(3)
+        time.sleep(5)
+    if page % 100 == 99:
+        file_count += 1
+        dataframe.to_excel('avtoelon_uz_' + str(file_count) + '.xlsx', index=False)
+        dataframe = DataFrame(columns=column_names)
+        row = 1
 
-dataframe.to_excel('avtoelon_uz.xlsx')
+if len(dataframe) > 0:
+    file_count += 1
+    dataframe.to_excel('avtoelon_uz_' + str(file_count) + '.xlsx', index=False)
+
+mergeFiles()
